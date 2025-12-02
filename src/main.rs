@@ -115,7 +115,7 @@ mod test {
 
         static ref ANSWERS: [(Answer, Answer); 12] = [
             (Answer::Numeric(1105), Answer::Numeric(6599)),   // Dec 1
-            (Answer::None, Answer::None),   // Dec 2
+            (Answer::Numeric(21139440284), Answer::Numeric(38731915928)),   // Dec 2
             (Answer::None, Answer::None),   // Dec 3
             (Answer::None, Answer::None),   // Dec 4
             (Answer::None, Answer::None),   // Dec 5
@@ -140,7 +140,7 @@ mod test {
 
     #[test]
     fn test_day() {
-        let day = 5;
+        let day = 2;
         let (d, text) = DAYS[day-1];
 
         assert_eq!(d.part1(text), ANSWERS[day-1].0);
