@@ -1,7 +1,7 @@
 use crate::day::{Day, Answer};
 
 struct Bank {
-    cells: Vec<u32>,
+    cells: Vec<usize>,
 }
 
 impl Bank {
@@ -9,35 +9,36 @@ impl Bank {
         let mut cells = Vec::new();
         for c in line.chars() {
             if let Some(n) = c.to_digit(10) {
-                cells.push(n);
+                cells.push(n as usize);
             }
         }
 
         Bank { cells }
     }
 
-    fn max_jolts(&self) -> u32 {
-        let mut best_msd = 0;
-        let mut best_msd_idx = 0;
-        let mut best_lsd = 0;
+    fn max_jolts(&self, n: usize) -> usize {
+        let mut result = 0;
+        let mut first_avail_idx = 0;
 
-        // Find best most sig digit
-        for n in 0..self.cells.len()-1 {
-            if self.cells[n] > best_msd {
-                best_msd = self.cells[n];
-                best_msd_idx = n;
+        for place in 0..n {
+            let mut best = 0;
+            let mut best_idx = 0;
+
+            // Find best digit for this place
+            for n in first_avail_idx..self.cells.len()-(n-1)+place {
+                if self.cells[n] > best {
+                    best = self.cells[n];
+                    best_idx = n;
+                }
             }
+
+            // Adopt the best digit we found
+            result *= 10;
+            result += best;
+            first_avail_idx = best_idx+1;
         }
 
-        // Find best least sig digit
-        for n in (best_msd_idx as usize)+1..self.cells.len() {
-            if self.cells[n] > best_lsd {
-                best_lsd = self.cells[n];
-            }
-        }
-
-        // combine the digits
-        best_msd*10 + best_lsd
+        result
     }
 }
 
@@ -80,7 +81,7 @@ impl Day for Day3 {
 
         let sum_jolts = input.banks.iter()
             .map(|b| {
-                b.max_jolts() as usize
+                b.max_jolts(2) as usize
             })
             .sum();
 
@@ -88,11 +89,16 @@ impl Day for Day3 {
     }
 
     fn part2(&self, text: &str) -> Answer {
-
         // Read input file into Input struct
-        let _input = Input::read(text);
+        let input = Input::read(text);
 
-        Answer::None
+        let sum_jolts = input.banks.iter()
+            .map(|b| {
+                b.max_jolts(12) as usize
+            })
+            .sum();
+
+        Answer::Numeric(sum_jolts)
     }
 }
 
@@ -122,10 +128,20 @@ mod test {
     fn test_max_jolts() {
         let input = Input::read(EXAMPLE1);
 
-        assert_eq!(input.banks[0].max_jolts(), 98);
-        assert_eq!(input.banks[1].max_jolts(), 89);
-        assert_eq!(input.banks[2].max_jolts(), 78);
-        assert_eq!(input.banks[3].max_jolts(), 92);
+        assert_eq!(input.banks[0].max_jolts(2), 98);
+        assert_eq!(input.banks[1].max_jolts(2), 89);
+        assert_eq!(input.banks[2].max_jolts(2), 78);
+        assert_eq!(input.banks[3].max_jolts(2), 92);
+    }
+
+    #[test]
+    fn test_max_jolts2() {
+        let input = Input::read(EXAMPLE1);
+
+        assert_eq!(input.banks[0].max_jolts(12), 987654321111);
+        assert_eq!(input.banks[1].max_jolts(12), 811111111119);
+        assert_eq!(input.banks[2].max_jolts(12), 434234234278);
+        assert_eq!(input.banks[3].max_jolts(12), 888911112111);
     }
 
     #[test]
@@ -142,7 +158,7 @@ mod test {
     fn test_part2() {
         // Based on the example in part 2.
         let d = Day3::new();
-        assert_eq!(d.part2(EXAMPLE1), Answer::None);
+        assert_eq!(d.part2(EXAMPLE1), Answer::Numeric(3121910778619));
     }
     
 }

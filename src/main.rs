@@ -114,9 +114,9 @@ mod test {
     lazy_static! {
 
         static ref ANSWERS: [(Answer, Answer); 12] = [
-            (Answer::Numeric(1105), Answer::Numeric(6599)),   // Dec 1
+            (Answer::Numeric(1105), Answer::Numeric(6599)),                 // Dec 1
             (Answer::Numeric(21139440284), Answer::Numeric(38731915928)),   // Dec 2
-            (Answer::Numeric(17193), Answer::None),   // Dec 3
+            (Answer::Numeric(17193), Answer::Numeric(171297349921310)),     // Dec 3
             (Answer::None, Answer::None),   // Dec 4
             (Answer::None, Answer::None),   // Dec 5
             (Answer::None, Answer::None),   // Dec 6
