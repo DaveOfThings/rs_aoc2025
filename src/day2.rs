@@ -12,7 +12,7 @@ impl Range {
 
     fn invalids(&self) -> HashSet<usize> {
         let mut invalids = HashSet::new();
-        println!("Looking for invalid values in range {} - {}", self.low, self.high);
+        // println!("Looking for invalid values in range {} - {}", self.low, self.high);
 
         for exp in 1..6 {
             let base = 10_usize.pow(exp);          // 10, 100, ... 1000000
@@ -28,7 +28,7 @@ impl Range {
                 let top_kernel = min(max_kernel, (self.high as f64 / multiplier as f64).floor() as usize);
 
                 for k in bottom_kernel ..= top_kernel {
-                    println!("    found {}", k * multiplier);
+                    // println!("    found {}", k * multiplier);
                     invalids.insert(k * multiplier);
                 }
             }
@@ -39,7 +39,7 @@ impl Range {
 
     fn invalids2(&self) -> HashSet<usize> {
         let mut invalids = HashSet::new();
-        println!("Looking for invalid values (part 2) in range {} - {}", self.low, self.high);
+        // println!("Looking for invalid values (part 2) in range {} - {}", self.low, self.high);
 
         for repeats in 2..=Self::MAX_DIGITS {
             for exp in 1..Self::MAX_DIGITS/repeats+1 {
@@ -51,7 +51,7 @@ impl Range {
                     multiplier *= base;
                     multiplier += 1;
                 }
-                println!("Checking with multiplier {multiplier}");
+                // println!("Checking with multiplier {multiplier}");
                 let lowest = min_kernel * multiplier;  // 11, 1010, ... 100000100000
                 let highest = max_kernel * multiplier; // 99, 9999, ... 999999999999
 
@@ -61,7 +61,7 @@ impl Range {
                     let top_kernel = min(max_kernel, (self.high as f64 / multiplier as f64).floor() as usize);
 
                     for k in bottom_kernel ..= top_kernel {
-                        println!("    found {}", k * multiplier);
+                        // println!("    found {}", k * multiplier);
                         invalids.insert(k * multiplier);
                     }
                 }
