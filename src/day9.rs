@@ -49,7 +49,14 @@ mod test {
     use crate::day::{Day, Answer};
     
     const EXAMPLE1: &str = "\
-Example input
+7,1
+11,1
+11,7
+9,7
+9,5
+2,5
+2,3
+7,3
 ";
 
     #[test]
