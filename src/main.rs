@@ -122,7 +122,7 @@ mod test {
             (Answer::Numeric(5733696195703), Answer::Numeric(10951882745757)),   // Dec 6
             (Answer::Numeric(1524), Answer::Numeric(32982105837605)),   // Dec 7
             (Answer::Numeric(50568), Answer::Numeric(36045012)),   // Dec 8
-            (Answer::None, Answer::None),   // Part 1 > 4707216618
+            (Answer::Numeric(4744899849), Answer::Numeric(1540192500)),   // Part 1 > 4707216618
             (Answer::None, Answer::None),   // Dec 10
             (Answer::None, Answer::None),   // Dec 11
             (Answer::None, Answer::None),   // Dec 12)
