@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, mem};
 
 use crate::day::{Day, Answer};
 
@@ -43,6 +43,49 @@ impl Input {
 
         splits
     }
+
+    fn timelines(&self) -> usize {
+        // Ping pong buffers for prior_timelines and curr_timelines
+        let mut timelines_a = vec![0; self.rows[0].len()];
+        let mut timelines_b = vec![0; self.rows[0].len()];
+
+        let prior_timelines = &mut timelines_a;
+        let curr_timelines = &mut timelines_b;
+
+        for row in &self.rows {
+            // Clear old values
+            for col_no in 0..row.len() {
+                curr_timelines[col_no] = 0;
+            }
+
+            // Accumulate timelines
+            for col_no in 0..row.len() {
+                // Get number of cols flowing from prior
+                match row[col_no] {
+                    'S' => {
+                        // Start a tachyon beam with 1 timeline
+                        curr_timelines[col_no] += 1;
+                    }
+                    '.' => {
+                        // Timelines can flow straight down
+                        curr_timelines[col_no] += prior_timelines[col_no];
+                    }
+                    '^' => {
+                        // A splitter here duplicates timelines
+                        curr_timelines[col_no-1] += prior_timelines[col_no];
+                        curr_timelines[col_no+1] += prior_timelines[col_no];
+                    }
+                    _ => {
+                        panic!("Unexpected character in input array: '{}', col:{col_no}", row[col_no]);
+                    }
+                }
+            }
+
+            mem::swap(prior_timelines, curr_timelines);
+        }
+
+        prior_timelines.iter().sum()
+    }
 }
 
 pub struct Day7 {
@@ -67,9 +110,9 @@ impl Day for Day7 {
     fn part2(&self, text: &str) -> Answer {
 
         // Read input file into Input struct
-        let _input = Input::read(text);
+        let input = Input::read(text);
 
-        Answer::None
+        Answer::Numeric(input.timelines())
     }
 }
 
@@ -117,6 +160,13 @@ mod test {
     }
 
     #[test]
+    fn test_timelines() {
+        let input = Input::read(EXAMPLE1);
+
+        assert_eq!(input.timelines(), 40);
+    }
+
+    #[test]
     // Compute part 1 result on example 1 and confirm expected value.
     fn test_part1() {
         // Based on the example in part 1.
@@ -130,7 +180,7 @@ mod test {
     fn test_part2() {
         // Based on the example in part 2.
         let d = Day7::new();
-        assert_eq!(d.part2(EXAMPLE1), Answer::None);
+        assert_eq!(d.part2(EXAMPLE1), Answer::Numeric(40));
     }
     
 }
