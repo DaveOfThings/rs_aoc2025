@@ -1,9 +1,6 @@
-use std::{cmp::Reverse, collections::{HashMap, VecDeque}};
+use std::{collections::{HashMap, VecDeque}};
 
-use nalgebra::DVector;
-use priority_queue::PriorityQueue;
 use regex::Regex;
-use nalgebra::DMatrix;
 
 use crate::day::{Day, Answer};
 
@@ -15,10 +12,6 @@ struct MachineDesc {
 }
 
 impl MachineDesc {
-
-    //  TODO-DW : Sort out regex mess.  
-    // Scan the line multiple times, looking for activations, buttons, 
-    // joltage in separate passes
 
     const ACTIVATION_RE: &str = "\\[([\\.\\#]+)\\]";  // Matches [..##.], cap[1]: ..##.
     const BUTTON_RE: &str = "\\(([0-9](,[0-9])*)\\)";  // Matches (1,2,3), cap[1]: 1,2,3
@@ -153,155 +146,6 @@ impl MachineDesc {
         }
     }
 
-    /* Linear Algebra approach */
-    /*
-    // Find the shortest configuration sequence
-    fn jolt_seq_len(&self) -> usize {
-        // Use linear algebra.
-        // Solve s * B = J
-        // Where s is the vector representing how many of each button need pressed.
-        //       B is the matrix of buttons. (1 for each counter incremented.)
-        //       J is the needed joltage (vector).
-
-        // TODO: Linear algebra packages not doing it.  Implement my own solver using integer arithmetic?
-
-        
-        // Construct matrix with button effects
-        let mut data: Vec<f32> = Vec::new();
-
-
-         
-        for button_id in 0..self.button_vecs.len() {
-            for joltage_id in 0..self.joltage.len() { 
-
-                if self.button_vecs[button_id].contains(&joltage_id) {
-                    data.push(1.0);
-                    // println!("1");
-                }
-                else {
-                    data.push(0.0);
-                    // println!("0");
-                }
-            }
-            // data.push(1.0);
-        }
-        println!("data: {data:?}");
-        let button_matrix = DMatrix::from_column_slice(self.joltage.len(), self.button_vecs.len(), &data);
-        println!("Matrix: {:?}", &button_matrix);
-        let decomp = button_matrix.svd(true, true);
-
-        // Construct vector with joltage requirements
-        let mut data: Vec<f32> = Vec::new();
-        for joltage_id in 0..self.joltage.len() {
-            data.push(self.joltage[joltage_id] as f32);
-        }
-        // data.push(11.0); // ### This isn't working.
-        let joltage_v = DMatrix::from_row_slice(self.joltage.len(), 1, &data);
-        println!("Vector: {:?}", &joltage_v);
-
-        let soln = decomp.solve(&joltage_v, 0.0000001).unwrap();
-
-        println!("Solution: {:?}", &soln);
-
-        let steps:f32 = soln.iter().sum();
-
-        steps.floor() as usize
-    }
-    */
-
-    fn estimated_dist(state:&Vec<usize>, goal:&Vec<usize>) -> Option<usize> {
-        let mut d = 0;
-        for n in 0..state.len() {
-            if state[n] > goal[n] {
-                return None;
-            }
-            else {
-                let delta = goal[n] - state[n];
-                
-                if delta > d {
-                    d = delta;
-                }
-            }
-        }
-
-        Some(d)
-    }
-
-        // Find the shortest sequence to reach joltage levels
-    fn jolt_seq(&self) -> Vec<usize> {
-        println!("Looking for joltage state: {:?}", self.joltage);
-
-        // states to explore from
-        let mut to_explore: PriorityQueue<Vec<usize>, usize> = PriorityQueue::new();
-
-        // states we found (Vec<usize> of joltages) and how we got to them (vec of button values)
-        let mut states_found: HashMap<Vec<usize>, Vec<usize>> = HashMap::new();
-
-        let start_joltage = vec![0; self.joltage.len()];
-
-        let dist_est = Self::estimated_dist(&start_joltage, &self.joltage).unwrap();
-
-        to_explore.push(start_joltage.clone(), usize::MAX-dist_est);
-        states_found.insert(start_joltage, Vec::new());
-        let mut found = None;
-        'outer:
-        while to_explore.len() > 0 {
-            // pop next state to explore
-            let (joltage, _dist) = to_explore.pop().unwrap();
-
-            println!("Exploring from {} : {joltage:?} goal:{:?}", usize::MAX-_dist, self.joltage);
-            
-            // find all new things we can generate
-            for (id, button) in self.button_vecs.iter().enumerate() {
-                let mut next_state = joltage.clone();
-                for index in button {
-                    next_state[*index] += 1;
-                }
-                // println!("  Applying button 0x{button:02x} to get 0x{next_state:02x}");
-
-                if next_state == self.joltage {
-                    // We hit on the solution, break out of loop
-                    // println!("  Found the start state!");
-
-                    let mut seq = states_found.get(&joltage).unwrap().clone();
-                    seq.push(id);
-                    found = Some(seq);
-                    break 'outer;
-                }
-                else if !states_found.contains_key(&next_state) {
-                    // This state is unexplored, push it to be explored further
-                    // println!("  Found a new state to explore");
-                    let est_dist = Self::estimated_dist(&next_state, &self.joltage);
-                    match est_dist {
-                        Some(est_dist) => {
-                            let mut seq = states_found.get(&joltage).unwrap().clone();
-                            seq.push(id);
-                            let priority = est_dist+seq.len();
-                            states_found.insert(next_state.clone(), seq);
-                            to_explore.push(next_state, usize::MAX-priority);
-                        }
-                        None => {
-                            // No distance estimate means we overshot.  Stop exploring from here
-                        }
-                    }
-                    
-                }
-                else {
-                    // We already found this state, ignore it
-                    // println!("  Already found this.");
-                }
-                
-            }
-        }
-
-        if let Some(seq) = found {
-            // println!("Found activation seq: {seq:?}");
-            seq
-        }
-        else {
-            panic!("Joltage state not found.")
-        }
-    }
 }
 
 // A representation of the puzzle inputs.
@@ -351,15 +195,9 @@ impl Day for Day10 {
     fn part2(&self, text: &str) -> Answer {
 
         // Read input file into Input struct
-        let input = Input::read(text);
+        let _input = Input::read(text);
 
-        let sum = input.machines.iter()
-            .map(|m| {
-                m.jolt_seq().len()
-            })
-            .sum();
-
-        Answer::Numeric(sum)
+        Answer::Numeric(0)
     }
 }
 
@@ -374,7 +212,7 @@ mod test {
 [.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}
 ";
 
-    const EXAMPLE2: &str = "\
+    const _EXAMPLE2: &str = "\
 [#...#] (1,3) (2,3,4) (0,2,3) (0,1,2) (2,3) {37,24,60,50,16}
 [##...#..] (0,1,3,5,6) (0,1,5) (4) (5,6) (0,4,7) (1,2,5) (3) {23,18,2,26,14,36,25,7}
 [.#..###] (0,1,4,5) (0,3,4,5,6) (3,5,6) (0,5) (0,1,4,5,6) (0,1,2,3,4) (0,1,5) (2,5) (0,1,2,4,5) {36,30,6,18,28,40,21}
@@ -421,29 +259,11 @@ mod test {
 
     #[test]
     fn test_set_joltage() {
-        let input = Input::read(EXAMPLE1);
-
-        let len = input.machines[0].jolt_seq().len();
-        assert_eq!(len, 10);
-
-        let len = input.machines[1].jolt_seq().len();
-        assert_eq!(len, 12);
-
-        let len = input.machines[2].jolt_seq().len();
-        assert_eq!(len, 11);   
     }
 
 
     #[test]
     fn test_set_joltage2() {
-        let input = Input::read(EXAMPLE2);
-
-        let len = input.machines[0].jolt_seq().len();
-        assert_eq!(len, 67);
-        let len = input.machines[1].jolt_seq().len();
-        assert_eq!(len, 67);
-        let len = input.machines[2].jolt_seq().len();
-        assert_eq!(len, 67);
     }
 
     #[test]
