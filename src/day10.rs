@@ -146,6 +146,112 @@ impl MachineDesc {
         }
     }
 
+    fn compare_rows(row1: &Vec<isize>, row2: &Vec<isize>) -> isize {
+        assert_eq!(row1.len(), row2.len());
+
+        for col in 0..row1.len() {
+            if row1[col] > row2[col] { return 1; }   // row1 is greater
+            if row1[col] < row2[col] { return -1; }  // row2 is greater
+        }
+
+        // Everything is equal
+        return 0;
+    }
+
+    fn print_m(m: &Vec<Vec<isize>>) {
+        for row in m.iter() {
+            println!("{row:?}");
+        }
+    }
+
+    fn ga(m: &mut Vec<Vec<isize>>) {
+        let mut key_row = 0;
+
+        while key_row < m.len()-1 {
+            // sort rows from key row down
+            for i in 0..m.len()-1 {
+                for j in i+1..m.len() {
+                    if MachineDesc::compare_rows(&m[i], &m[j]) < 0 {
+                        // swap these rows
+                        m.swap(i, j);
+                    }
+                }
+            }
+
+            println!("Sorted:");
+            MachineDesc::print_m(m);
+
+            // reduce rows below key row by subtracting key_row
+            for row in key_row+1..m.len() {
+                if m[row][key_row] == 1 {
+                    // subtract key row from this
+                    for col in key_row..m[0].len() {
+                        m[row][col] -= m[key_row][col];
+                    }
+                    /*
+                    if m[row][key_row+1] < 0 {
+                        for col in key_row..m[0].len() {
+                            m[row][col] *= -1;
+                        }  
+                    }
+                    */
+                }
+            }
+
+            // (if result is negative in most sig place, negate the row)
+            for row in key_row+1..m.len() {
+                let mut sign = None;
+                for col in 0..m[0].len() {
+                    if sign.is_none() && m[row][col] > 0 {
+                        // sign is positive
+                        sign = Some(1);
+                    }
+                    if sign.is_none() && m[row][col] < 0 {
+                        // negative sign
+                        sign = Some(-1);
+                    }
+                }
+
+                if sign == Some(-1) {
+                    for col in 0..m[0].len() {
+                        m[row][col] *= -1;
+                    }
+                }
+            }
+
+            println!("Reduced:");
+            MachineDesc::print_m(m);
+
+            key_row += 1;
+        }
+        println!("===============================");
+    }
+
+    fn joltage_seq(&self) -> Vec<usize> {
+        // Create augmented matrix for gaussian elimination
+        let mut m = vec![vec![0_isize; self.button_vecs.len()+1]; self.joltage.len()];
+
+        // Set elements from button_vecs
+        for (col, vec) in self.button_vecs.iter().enumerate() {
+            for elt in vec.iter() {
+                m[*elt][col] = 1;
+            }
+        }
+        for (row, value) in self.joltage.iter().enumerate() {
+            m[row][self.button_vecs.len()] = *value as isize;
+        }
+
+        // Print the matrix
+        MachineDesc::print_m(&m);
+
+        MachineDesc::ga(&mut m);
+
+        // Find solutions to the reduced problem
+        // TODO
+        let mut _seq = vec![0; self.joltage.len()];
+        _seq
+    }
+
 }
 
 // A representation of the puzzle inputs.
@@ -212,12 +318,6 @@ mod test {
 [.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}
 ";
 
-    const _EXAMPLE2: &str = "\
-[#...#] (1,3) (2,3,4) (0,2,3) (0,1,2) (2,3) {37,24,60,50,16}
-[##...#..] (0,1,3,5,6) (0,1,5) (4) (5,6) (0,4,7) (1,2,5) (3) {23,18,2,26,14,36,25,7}
-[.#..###] (0,1,4,5) (0,3,4,5,6) (3,5,6) (0,5) (0,1,4,5,6) (0,1,2,3,4) (0,1,5) (2,5) (0,1,2,4,5) {36,30,6,18,28,40,21}
-";
-
     #[test]
     // Read part 1 example and confirm inputs
     fn test_read_part1() {
@@ -259,11 +359,16 @@ mod test {
 
     #[test]
     fn test_set_joltage() {
-    }
+        let input = Input::read(EXAMPLE1);
 
+        let joltage_seq = input.machines[0].joltage_seq();
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 0); // 10
 
-    #[test]
-    fn test_set_joltage2() {
+        let joltage_seq = input.machines[1].joltage_seq();
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 0); // 12
+
+        let joltage_seq = input.machines[2].joltage_seq();
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 0); // 11     
     }
 
     #[test]
@@ -273,7 +378,6 @@ mod test {
         let d = Day10::new();
         assert_eq!(d.part1(EXAMPLE1), Answer::Numeric(7));
     }
-
 
     #[test]
     // Compute part 2 result on example 2 and confirm expected value.
