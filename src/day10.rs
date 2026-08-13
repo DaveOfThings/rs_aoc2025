@@ -1,6 +1,9 @@
-use std::{collections::{HashMap, VecDeque}};
-
+use std::{cmp::Ordering, collections::{HashMap, HashSet, VecDeque}};
+use std::cmp::min;
+use std::mem::swap;
+use num_rational::Rational32;
 use regex::Regex;
+use num_traits::Signed;
 
 use crate::day::{Day, Answer};
 
@@ -146,7 +149,7 @@ impl MachineDesc {
         }
     }
 
-    fn compare_rows(row1: &Vec<isize>, row2: &Vec<isize>) -> isize {
+    fn compare_rows(row1: &Vec<Rational32>, row2: &Vec<Rational32>) -> isize {
         assert_eq!(row1.len(), row2.len());
 
         for col in 0..row1.len() {
@@ -158,98 +161,251 @@ impl MachineDesc {
         return 0;
     }
 
-    fn print_m(m: &Vec<Vec<isize>>) {
+    fn print_m(m: &Vec<Vec<Rational32>>) {
         for row in m.iter() {
-            println!("{row:?}");
+            for cell in row.iter() {
+                print!("{} ", (*cell.numer() as f32)/(*cell.denom() as f32));
+            }
+            println!("");
         }
     }
 
-    fn ga(m: &mut Vec<Vec<isize>>) {
-        let mut key_row = 0;
-
-        while key_row < m.len()-1 {
-            // sort rows from key row down
-            for i in 0..m.len()-1 {
-                for j in i+1..m.len() {
-                    if MachineDesc::compare_rows(&m[i], &m[j]) < 0 {
-                        // swap these rows
-                        m.swap(i, j);
-                    }
-                }
-            }
-
-            println!("Sorted:");
-            MachineDesc::print_m(m);
-
-            // reduce rows below key row by subtracting key_row
-            for row in key_row+1..m.len() {
-                if m[row][key_row] == 1 {
-                    // subtract key row from this
-                    for col in key_row..m[0].len() {
-                        m[row][col] -= m[key_row][col];
-                    }
-                    /*
-                    if m[row][key_row+1] < 0 {
-                        for col in key_row..m[0].len() {
-                            m[row][col] *= -1;
-                        }  
-                    }
-                    */
-                }
-            }
-
-            // (if result is negative in most sig place, negate the row)
-            for row in key_row+1..m.len() {
-                let mut sign = None;
-                for col in 0..m[0].len() {
-                    if sign.is_none() && m[row][col] > 0 {
-                        // sign is positive
-                        sign = Some(1);
-                    }
-                    if sign.is_none() && m[row][col] < 0 {
-                        // negative sign
-                        sign = Some(-1);
-                    }
-                }
-
-                if sign == Some(-1) {
-                    for col in 0..m[0].len() {
-                        m[row][col] *= -1;
-                    }
-                }
-            }
-
-            println!("Reduced:");
-            MachineDesc::print_m(m);
-
-            key_row += 1;
+    fn print_v(m: &Vec<Rational32>) {
+        for cell in m.iter() {
+            print!("{} ", (*cell.numer() as f32)/(*cell.denom() as f32));
         }
-        println!("===============================");
+        println!("");
     }
 
+    // TODO-DW : This special gaussian elimination routine depends on all elements of incoming array to be 0 or 1.
+    // (All except the augmented column, that is.)  It tries to preserve all elements as (-1, 0, 1) throughout the
+    // computations below.  (Can we prove this?)
+    fn ga(m: &mut Vec<Vec<Rational32>>) {
+        // diagonal length is minimum of rows or columns (not counting augmented column)
+        let n_rows = m.len();
+        let n_cols = m[0].len();
+
+        let diag_len = min(n_rows, n_cols-1);
+
+        for n in 0..diag_len {
+            /*
+            // Sort the remaining rows
+            for row1 in n..n_rows-1 {
+                for row2 in row1+1..n_rows {
+                    if Self::compare_rows(&m[row1], &m[row2]) < 0 {
+                        m.swap(row1, row2);
+                    }
+                }
+            }
+            */
+
+            /* */
+            // Before pivoting, negate any row with a negative value in col n
+            for row in n..n_rows {
+                if m[row][n] < Rational32::ZERO {
+                    for col in n..n_cols {
+                        m[row][col] = -m[row][col];
+                    }
+                }
+            }
+
+            // Pivot rows and columns to get largest value in m[n][n]
+            let mut max_row = n;
+            let mut max_col = n;
+            let mut max_val = m[n][n].abs();
+            for row in n..n_rows {
+                for col in n..n_cols-1 {
+                    if m[row][col].abs() > max_val {
+                        max_row = row;
+                        max_col = col;
+                        max_val = m[row][col].abs();
+                    }
+                }
+            }
+
+            // swap row and/or column to put max in pivot position
+            m.swap(n, max_row);  // swap rows
+            for row in 0..m.len() {  // swap cols
+                m[row].swap(n, max_col);
+            }
+            /* */
+
+            // println!("Pivoted for ({n}, {n}):");
+            // MachineDesc::print_m(m);
+
+            // Normalize row n
+            let divisor = m[n][n];
+            if divisor != Rational32::ZERO {
+                m[n][n] = Rational32::ONE;
+                for col in n+1..n_cols {
+                    m[n][col] /= divisor;
+                }
+            }
+
+            // Eliminate m[row][n] from all rows > n by subtracting row n
+            // Plot twist: If the row being eliminated has a negative value in col n,
+            // Negate that row before subtracting key row.
+            for row in n+1..n_rows {
+                if m[row][n] != Rational32::ZERO {
+                    let factor = m[row][n];
+                    for col in n..n_cols {
+                        m[row][col] = m[row][col] - factor * m[n][col];
+                    }  
+                }
+            }
+
+            for row in n+1..n_rows {
+                // If most sig remaining element is negative, negate the row
+                let mut negate = false;
+                for col in 0..n_cols-1 {
+                    if m[row][col] > Rational32::ZERO {
+                        negate = false;
+                        break;
+                    }
+                    if m[row][col] < Rational32::ZERO {
+                        negate = true;
+                        break;
+                    }
+                }
+                if negate {
+                    for col in 0..n_cols {
+                        m[row][col] = -m[row][col];
+                    }  
+                }
+            }
+
+            // println!("After elimination:");
+            // MachineDesc::print_m(m);
+
+        }
+
+        println!("After Gaussian elimination:");
+        MachineDesc::print_m(m);
+    }
+
+    // Find solution with back substitution
+    fn bs(m: & Vec<Vec<Rational32>>) -> Vec<Rational32> {
+        let n_rows = m.len();
+        let n_cols = m[0].len() - 1;
+
+        let mut soln = vec![Rational32::ZERO; n_cols];
+
+        // count dependent variables
+        let mut d_vars = 0;
+        for n in 0..min(n_rows, n_cols) {
+            if m[n][n] == Rational32::ONE {
+                d_vars += 1;
+            }
+        }
+
+        // number of independent variables
+        let i_vars = n_cols - d_vars;
+
+        println!("There are {n_cols} variables.  {i_vars} are free.");
+
+        // Iterate over sum value of free variables
+        let mut test_vectors = HashSet::<Vec<Rational32>>::new();
+        test_vectors.insert(vec![Rational32::ZERO; i_vars]);
+
+        let mut next_test_vectors = HashSet::<Vec<Rational32>>::new();
+
+
+        let mut loops = 0;
+
+        'outer:
+        loop {
+            // Iterate over test_vectors
+            for v in &test_vectors {
+                println!("Generating solution with test vector: {v:?}");
+
+                // Generate the solution vector
+                for n in 0..i_vars {
+                    soln[d_vars+n] = v[n];
+                }
+                for n in 0..d_vars {
+                    let r = d_vars - n - 1;  // row to solve with back substitution
+                    let mut sum = Rational32::ZERO;
+                    for c in r+1..n_cols {
+                        sum += m[r][c] * soln[c];
+                    }
+                    soln[r] = m[r][n_cols] - sum;
+                }
+
+                // Test whether solution is valid (non-negative integers.)
+                // If solution is valid, return it.
+                let mut all_good = true;
+                for component in &soln {
+                    if (*component < Rational32::ZERO) || (*component.denom() != 1) {
+                        all_good = false;
+                    }
+                }
+                if all_good {
+                    break 'outer;
+                }
+            }
+
+            /*
+            // So my debug cases don't loop infinitely when there are no free variables.
+            if i_vars < 1 {
+                break 'outer;
+            }
+            */
+
+            // Generate next set of test vectors
+            next_test_vectors.clear();
+            // Use each member of test_vectors to generate some next test vectors
+            for v in &test_vectors {
+                for position in 0..i_vars {
+                    let mut new_v = v.clone();
+                    new_v[position] += 1;
+                    next_test_vectors.insert(new_v);
+                }
+            }
+
+            // Swap next_test_vectors into test_vectors before repeating loop.
+            swap(&mut test_vectors, &mut next_test_vectors);
+        }
+
+        soln
+    }
+
+    // TODO: Fix problem.  This function gives different answers on each call.  The reason is that the HashMap of test_vectors used
+    // in bs() call doesn't iterate in a determinate order.  And we need to find the minimal solution so we should be trying all of them
+    // until we know we've seen a minimum.
+    
     fn joltage_seq(&self) -> Vec<usize> {
         // Create augmented matrix for gaussian elimination
-        let mut m = vec![vec![0_isize; self.button_vecs.len()+1]; self.joltage.len()];
+        let mut m = vec![vec![Rational32::ZERO; self.button_vecs.len()+1]; self.joltage.len()];
 
         // Set elements from button_vecs
         for (col, vec) in self.button_vecs.iter().enumerate() {
             for elt in vec.iter() {
-                m[*elt][col] = 1;
+                m[*elt][col] = Rational32::ONE;
             }
         }
         for (row, value) in self.joltage.iter().enumerate() {
-            m[row][self.button_vecs.len()] = *value as isize;
+            m[row][self.button_vecs.len()] = Rational32::from_integer(*value as i32);
         }
 
         // Print the matrix
         MachineDesc::print_m(&m);
 
+        // Gaussian Elimination
         MachineDesc::ga(&mut m);
+        let soln = MachineDesc::bs(&m);
+
+        println!("Solution vector:");
+        MachineDesc::print_v(&soln);
+
+        println!("===============================");
 
         // Find solutions to the reduced problem
         // TODO
-        let mut _seq = vec![0; self.joltage.len()];
-        _seq
+        let seq = soln.iter().map(|c| {
+                *c.numer() as usize
+            }).collect();
+
+        seq
     }
 
 }
@@ -301,9 +457,17 @@ impl Day for Day10 {
     fn part2(&self, text: &str) -> Answer {
 
         // Read input file into Input struct
-        let _input = Input::read(text);
+        let input = Input::read(text);
 
-        Answer::Numeric(0)
+        let sum = input.machines.iter()
+            .map(|m| {
+                let seq = m.joltage_seq();
+                let s: usize = seq.iter().sum();
+                s
+            })
+            .sum();
+
+        Answer::Numeric(sum)
     }
 }
 
@@ -311,6 +475,7 @@ impl Day for Day10 {
 mod test {
     use crate::day10::{Day10, Input};
     use crate::day::{Day, Answer};
+    use data_aoc2025::DAY10_INPUT;
     
     const EXAMPLE1: &str = "\
 [.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
@@ -362,13 +527,22 @@ mod test {
         let input = Input::read(EXAMPLE1);
 
         let joltage_seq = input.machines[0].joltage_seq();
-        assert_eq!(joltage_seq.iter().sum::<usize>(), 0); // 10
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 10); // 10
 
         let joltage_seq = input.machines[1].joltage_seq();
-        assert_eq!(joltage_seq.iter().sum::<usize>(), 0); // 12
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 12); // 12
 
         let joltage_seq = input.machines[2].joltage_seq();
-        assert_eq!(joltage_seq.iter().sum::<usize>(), 0); // 11     
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 11); // 11     
+    }
+
+    #[test]
+    fn test_real_set_joltage() {
+        let input = Input::read(DAY10_INPUT);
+        for n in 0..input.machines.len() {
+            let joltage_seq = input.machines[n].joltage_seq();
+            // assert_eq!(joltage_seq.iter().sum::<usize>(), 0);
+        }
     }
 
     #[test]

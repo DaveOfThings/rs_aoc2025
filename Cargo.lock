@@ -436,6 +436,8 @@ dependencies = [
  "lazy_static",
  "mem",
  "nalgebra",
+ "num-rational",
+ "num-traits",
  "priority-queue",
  "regex",
  "vector3d",
