@@ -187,17 +187,12 @@ impl MachineDesc {
 
         let diag_len = min(n_rows, n_cols-1);
 
+        let mut col_seq = vec![0; n_cols-1];
+        for n in 0..n_cols-1 {
+            col_seq[n] = n;
+        }
+
         for n in 0..diag_len {
-            /*
-            // Sort the remaining rows
-            for row1 in n..n_rows-1 {
-                for row2 in row1+1..n_rows {
-                    if Self::compare_rows(&m[row1], &m[row2]) < 0 {
-                        m.swap(row1, row2);
-                    }
-                }
-            }
-            */
 
             /* */
             // Before pivoting, negate any row with a negative value in col n
@@ -225,10 +220,10 @@ impl MachineDesc {
 
             // swap row and/or column to put max in pivot position
             m.swap(n, max_row);  // swap rows
-            for row in 0..m.len() {  // swap cols
-                m[row].swap(n, max_col);
+            for row in 0..n_rows {
+                m[row].swap(n, max_col);  // swap cols
+                col_seq.swap(n, max_col);    // keep track of col swaps
             }
-            /* */
 
             // println!("Pivoted for ({n}, {n}):");
             // MachineDesc::print_m(m);
@@ -281,27 +276,31 @@ impl MachineDesc {
 
         println!("After Gaussian elimination:");
         MachineDesc::print_m(m);
+        println!("Column order:");
+        println!("{col_seq:?}");
     }
 
     // Find solution with back substitution
     fn bs(m: & Vec<Vec<Rational32>>) -> Vec<Rational32> {
         let n_rows = m.len();
-        let n_cols = m[0].len() - 1;
+        let n_cols = m[0].len();
 
-        let mut soln = vec![Rational32::ZERO; n_cols];
+        let mut soln = vec![Rational32::ZERO; n_cols-1];
+        let mut min_soln = vec![Rational32::ZERO; n_cols-1];
+        let mut min_soln_sum: Option<usize> = None;
 
         // count dependent variables
         let mut d_vars = 0;
-        for n in 0..min(n_rows, n_cols) {
+        for n in 0..min(n_rows, n_cols-1) {
             if m[n][n] == Rational32::ONE {
                 d_vars += 1;
             }
         }
 
         // number of independent variables
-        let i_vars = n_cols - d_vars;
+        let i_vars = n_cols-1 - d_vars;
 
-        println!("There are {n_cols} variables.  {i_vars} are free.");
+        println!("There are {d_vars} dependent variables.  {i_vars} are free.");
 
         // Iterate over sum value of free variables
         let mut test_vectors = HashSet::<Vec<Rational32>>::new();
@@ -310,13 +309,13 @@ impl MachineDesc {
         let mut next_test_vectors = HashSet::<Vec<Rational32>>::new();
 
 
+        let mut max_loops = None;
         let mut loops = 0;
-
-        'outer:
         loop {
             // Iterate over test_vectors
             for v in &test_vectors {
-                println!("Generating solution with test vector: {v:?}");
+
+                // println!("Generating solution with test vector: {v:?}");
 
                 // Generate the solution vector
                 for n in 0..i_vars {
@@ -325,10 +324,10 @@ impl MachineDesc {
                 for n in 0..d_vars {
                     let r = d_vars - n - 1;  // row to solve with back substitution
                     let mut sum = Rational32::ZERO;
-                    for c in r+1..n_cols {
+                    for c in r+1..n_cols-1 {
                         sum += m[r][c] * soln[c];
                     }
-                    soln[r] = m[r][n_cols] - sum;
+                    soln[r] = m[r][n_cols-1] - sum;
                 }
 
                 // Test whether solution is valid (non-negative integers.)
@@ -340,16 +339,47 @@ impl MachineDesc {
                     }
                 }
                 if all_good {
-                    break 'outer;
+                    // This is a good candidate.  Check it's sum and see if it's less that what we had
+                    let sum = soln.iter().map(|c| {*c.numer() as usize}).sum();
+                    match min_soln_sum {
+                        Some(old_min) => {
+                            if sum < old_min {
+                                // println!("  New minimum: {sum}");
+                                MachineDesc::print_v(&soln);
+                                min_soln_sum = Some(sum);
+                                min_soln = soln.clone();
+                            }
+                        }
+                        None => {
+                            // println!("  First minimum: {sum}");
+                            MachineDesc::print_v(&soln);
+                            min_soln_sum = Some(sum);
+                            min_soln = soln.clone();
+                        }
+                    }
                 }
             }
 
-            /*
-            // So my debug cases don't loop infinitely when there are no free variables.
+            // Don't loop if there are no free variables
             if i_vars < 1 {
-                break 'outer;
+                break;
             }
-            */
+
+            loops += 1;
+            if let Some(max) = max_loops {
+                if loops > max {
+                    break;
+                }
+            }
+            if max_loops.is_none() && min_soln_sum.is_some() {
+                // The max number of loops should be loops + the largest component of the initial solution.
+                let max = min_soln.iter().map(|c| { c.numer().abs() as usize }).max().unwrap();
+                max_loops = Some(loops+max);
+                // println!("Max loops set at {}", loops+max);
+            }
+
+            // println!("Loop {loops}");
+
 
             // Generate next set of test vectors
             next_test_vectors.clear();
@@ -366,13 +396,13 @@ impl MachineDesc {
             swap(&mut test_vectors, &mut next_test_vectors);
         }
 
-        soln
+        min_soln
     }
 
     // TODO: Fix problem.  This function gives different answers on each call.  The reason is that the HashMap of test_vectors used
     // in bs() call doesn't iterate in a determinate order.  And we need to find the minimal solution so we should be trying all of them
     // until we know we've seen a minimum.
-    
+
     fn joltage_seq(&self) -> Vec<usize> {
         // Create augmented matrix for gaussian elimination
         let mut m = vec![vec![Rational32::ZERO; self.button_vecs.len()+1]; self.joltage.len()];
@@ -454,6 +484,10 @@ impl Day for Day10 {
         Answer::Numeric(sum)
     }
 
+    // 21932 is too high, 21288 too high.  The ga() function gives different answers based on how many times it runs the
+    // main loop and which order variants are tried within that loop.  Returning the first solution gives inconsistent results.
+    // Returning the value on the first successful loop iteration gives 21932, too high.  And running for up to 50 iterations
+    //  gives 21288 which is too low.  How can this produce values lower than the answer, which should be the minimum?!
     fn part2(&self, text: &str) -> Answer {
 
         // Read input file into Input struct
@@ -481,6 +515,14 @@ mod test {
 [.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
 [...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}
 [.###.#] (0,1,2,3,4) (0,3,4) (0,1,2,4,5) (1,2) {10,11,11,5,10,5}
+";
+
+    const EXAMPLE2: &str = "\
+[#.#..##] (1,3,6) (4,5) (1,2) (1,2,4,5) (0,1,4,5,6) (0,1) (3) (1,2,4) (1,5) {21,73,20,28,28,36,19}
+";
+
+    const EXAMPLE3: &str = "\
+[..#####.##] (1,3,4,6,7,8,9) (4) (0,2) (0,2,3,4,5,7,8,9) (3,6,7,9) (1,5,8) (0,1,2,3,4,6,8) (1,7,8) (0,1,2,3,4,8,9) (2,7,9) (0,1,2,5,6,8) (2,4,7,8) (6,8,9) {73,75,92,46,75,30,45,37,109,39}
 ";
 
     #[test]
@@ -534,6 +576,22 @@ mod test {
 
         let joltage_seq = input.machines[2].joltage_seq();
         assert_eq!(joltage_seq.iter().sum::<usize>(), 11); // 11     
+    }
+
+    #[test]
+    fn test2_set_joltage() {
+        let input = Input::read(EXAMPLE2);
+
+        let joltage_seq = input.machines[0].joltage_seq();
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 10); // 10 
+    }
+
+    #[test]
+    fn test3_set_joltage() {
+        let input = Input::read(EXAMPLE3);
+
+        let joltage_seq = input.machines[0].joltage_seq();
+        assert_eq!(joltage_seq.iter().sum::<usize>(), 10); // 10 
     }
 
     #[test]

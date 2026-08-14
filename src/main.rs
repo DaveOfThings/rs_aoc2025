@@ -123,7 +123,7 @@ mod test {
             (Answer::Numeric(1524), Answer::Numeric(32982105837605)),   // Dec 7
             (Answer::Numeric(50568), Answer::Numeric(36045012)),   // Dec 8
             (Answer::Numeric(4744899849), Answer::Numeric(1540192500)),   // Part 1 > 4707216618
-            (Answer::Numeric(502), Answer::Numeric(21959)),   // Dec 10
+            (Answer::Numeric(502), Answer::Numeric(21467)),   // Dec 10 21932 is too high, 21288 too low.
             (Answer::None, Answer::None),   // Dec 11
             (Answer::None, Answer::None),   // Dec 12)
         ];
