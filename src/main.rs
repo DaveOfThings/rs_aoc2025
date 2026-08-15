@@ -125,7 +125,7 @@ mod test {
             (Answer::Numeric(4744899849), Answer::Numeric(1540192500)),   // Part 1 > 4707216618
             (Answer::Numeric(502), Answer::Numeric(21467)),   // Dec 10 21932 is too high, 21288 too low.
             (Answer::Numeric(690), Answer::Numeric(557332758684000)),   // Dec 11
-            (Answer::None, Answer::None),   // Dec 12)
+            (Answer::Numeric(577), Answer::None),   // Dec 12)
         ];
     }
 
@@ -140,7 +140,7 @@ mod test {
 
     #[test]
     fn test_day() {
-        let day = 11;
+        let day = 12;
         let (d, text) = DAYS[day-1];
 
         assert_eq!(d.part1(text), ANSWERS[day-1].0);

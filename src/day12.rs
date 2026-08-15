@@ -95,6 +95,38 @@ impl Input {
 
         Input { pieces, boards }
     }
+
+    fn area_fits(&self, board_id: usize) -> bool {
+        let board = &self.boards[board_id];
+        let board_area = board.height * board.width;
+
+        let pieces_area: usize = board.counts.iter()
+            .enumerate()
+            .map(|(index, count)| {
+                self.pieces[index].coverage.len() * count
+            })
+            .sum();
+
+        /*
+        println!("Pieces area: {pieces_area}, Board area: {board_area}");
+        if board_area > pieces_area {
+            let pct_free = 100.0*((board_area - pieces_area) as f64)/(board_area as f64);
+            println!("  {}% free", pct_free);
+            assert!(pct_free > 26.0);
+        }
+        */
+
+        pieces_area < board_area
+    }
+
+    fn trivial_fit(&self, board_id: usize) -> bool {
+        let board = &self.boards[board_id];
+        let pieces_h = board.height / 3;
+        let pieces_w = board.width / 3;
+        let easy_fit_pieces = pieces_h * pieces_w;
+
+        easy_fit_pieces >= board.counts.iter().sum()
+    }
 }
 
 pub struct Day12 {
@@ -113,7 +145,17 @@ impl Day for Day12 {
         // Read input file into Input struct
         let _input = Input::read(text);
 
-        Answer::None
+        // This relies on the assumption that all solutions are trivial solutions.
+
+        // TODO : Make trivial_fit a method on board, not input, then use iter()
+        let mut trivial_fits = 0;
+        for n in 0.._input.boards.len() {
+            if _input.trivial_fit(n) {
+                trivial_fits += 1;
+            }
+        }
+
+        Answer::Numeric(trivial_fits)
     }
 
     fn part2(&self, text: &str) -> Answer {
@@ -129,6 +171,7 @@ impl Day for Day12 {
 mod test {
     use crate::day12::{Day12, Input};
     use crate::day::{Day, Answer};
+    use data_aoc2025::DAY12_INPUT;
     
     const EXAMPLE1: &str = "\
 0:
@@ -166,6 +209,43 @@ mod test {
 12x5: 1 0 1 0 3 2
 ";
 
+    const EXAMPLE2: &str = "\
+0:
+#..
+##.
+.##
+
+1:
+###
+.#.
+###
+
+2:
+###
+###
+..#
+
+3:
+###
+.##
+##.
+
+4:
+###
+##.
+#..
+
+5:
+#.#
+#.#
+###
+
+37x39: 41 36 41 38 28 38
+43x43: 42 58 49 46 45 43
+45x42: 42 52 44 61 39 50
+42x45: 38 30 36 43 26 37
+";
+
     #[test]
     // Read part 1 example and confirm inputs
     fn test_read_part1() {
@@ -182,11 +262,56 @@ mod test {
     }
 
     #[test]
+    fn test_area_fits() {
+        let input = Input::read(EXAMPLE1);
+        let input2 = Input::read(EXAMPLE2);
+
+        assert_eq!(input.area_fits(0), true);
+        assert_eq!(input.area_fits(1), true);
+        assert_eq!(input.area_fits(2), true);
+
+        assert_eq!(input2.area_fits(0), false);
+        assert_eq!(input2.area_fits(1), false);
+        assert_eq!(input2.area_fits(2), false);
+        assert_eq!(input2.area_fits(3), true);
+    }
+
+    #[test]
+    fn test_area_fits_real() {
+        let input = Input::read(DAY12_INPUT);
+
+        let misfits = input.boards.iter().enumerate()
+            .filter(|(n, _board)| {
+                !input.area_fits(*n)
+            })
+            .count();
+
+        println!("{misfits} out of {} can't fit.", input.boards.len());
+
+        assert_eq!(misfits, 0);
+    }
+
+      #[test]
+    fn test_trivial_fits_real() {
+        let input = Input::read(DAY12_INPUT);
+
+        let trivial = input.boards.iter().enumerate()
+            .filter(|(n, _board)| {
+                input.trivial_fit(*n)
+            })
+            .count();
+
+        println!("{trivial} out of {} fit trivially.", input.boards.len());
+
+        assert_eq!(trivial, 0);
+    }
+
+    #[test]
     // Compute part 1 result on example 1 and confirm expected value.
     fn test_part1() {
         // Based on the example in part 1.
         let d = Day12::new();
-        assert_eq!(d.part1(EXAMPLE1), Answer::None);
+        assert_eq!(d.part1(DAY12_INPUT), Answer::Numeric(577));
     }
 
     #[test]
