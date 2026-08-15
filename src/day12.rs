@@ -2,12 +2,14 @@ use regex::Regex;
 
 use crate::day::{Day, Answer};
 
+// One piece to fit on the board
 #[derive(Clone)]
 struct Piece {
     id: usize,
     coverage: Vec<(usize, usize)>,  // vector of covered spaces (row, col)
 }
 
+// Methods for constructing pieces from the input
 impl Piece {
     pub fn default() -> Piece {
         let coverage = Vec::new();
@@ -31,10 +33,34 @@ impl Piece {
     }
 }
 
+// One board and the numbers of pieces that need to fit on it.
 struct Board {
     width: usize,
     height: usize,
     counts: Vec<usize>,
+}
+
+impl Board {
+    fn is_impossible(&self, pieces: &Vec<Piece>) -> bool {
+        let board_area = self.height * self.width;
+
+        let pieces_area: usize = self.counts.iter()
+            .enumerate()
+            .map(|(index, count)| {
+                pieces[index].coverage.len() * count
+            })
+            .sum();
+
+        pieces_area > board_area
+    }
+
+    fn is_trivial(&self, piece_w: usize, piece_h: usize) -> bool {
+        let pieces_h = self.height / piece_h;
+        let pieces_w = self.width / piece_w;
+        let easy_fit_pieces = pieces_h * pieces_w;
+
+        easy_fit_pieces >= self.counts.iter().sum()
+    }
 }
 
 // A representation of the puzzle inputs.
@@ -95,38 +121,6 @@ impl Input {
 
         Input { pieces, boards }
     }
-
-    fn area_fits(&self, board_id: usize) -> bool {
-        let board = &self.boards[board_id];
-        let board_area = board.height * board.width;
-
-        let pieces_area: usize = board.counts.iter()
-            .enumerate()
-            .map(|(index, count)| {
-                self.pieces[index].coverage.len() * count
-            })
-            .sum();
-
-        /*
-        println!("Pieces area: {pieces_area}, Board area: {board_area}");
-        if board_area > pieces_area {
-            let pct_free = 100.0*((board_area - pieces_area) as f64)/(board_area as f64);
-            println!("  {}% free", pct_free);
-            assert!(pct_free > 26.0);
-        }
-        */
-
-        pieces_area < board_area
-    }
-
-    fn trivial_fit(&self, board_id: usize) -> bool {
-        let board = &self.boards[board_id];
-        let pieces_h = board.height / 3;
-        let pieces_w = board.width / 3;
-        let easy_fit_pieces = pieces_h * pieces_w;
-
-        easy_fit_pieces >= board.counts.iter().sum()
-    }
 }
 
 pub struct Day12 {
@@ -145,24 +139,27 @@ impl Day for Day12 {
         // Read input file into Input struct
         let _input = Input::read(text);
 
-        // This relies on the assumption that all solutions are trivial solutions.
+        let trivial_fits = _input.boards.iter()
+            .filter(|b| {
+                b.is_trivial(3, 3)
+            })
+            .count();
 
-        // TODO : Make trivial_fit a method on board, not input, then use iter()
-        let mut trivial_fits = 0;
-        for n in 0.._input.boards.len() {
-            if _input.trivial_fit(n) {
-                trivial_fits += 1;
-            }
-        }
+        let impossible = _input.boards.iter()
+            .filter(|b| {
+                b.is_impossible(&_input.pieces)
+            })
+            .count();
+
+        // This relies on the assumption that all solutions are trivial solutions.
+        // Assert that we've accounted for all the boards between trivial solutions and impossible ones.
+        assert_eq!(_input.boards.len(), trivial_fits+impossible);
 
         Answer::Numeric(trivial_fits)
     }
 
-    fn part2(&self, text: &str) -> Answer {
-
-        // Read input file into Input struct
-        let _input = Input::read(text);
-
+    fn part2(&self, _text: &str) -> Answer {
+        // There is no part 2 for Day 12
         Answer::None
     }
 }
@@ -171,7 +168,6 @@ impl Day for Day12 {
 mod test {
     use crate::day12::{Day12, Input};
     use crate::day::{Day, Answer};
-    use data_aoc2025::DAY12_INPUT;
     
     const EXAMPLE1: &str = "\
 0:
@@ -266,44 +262,29 @@ mod test {
         let input = Input::read(EXAMPLE1);
         let input2 = Input::read(EXAMPLE2);
 
-        assert_eq!(input.area_fits(0), true);
-        assert_eq!(input.area_fits(1), true);
-        assert_eq!(input.area_fits(2), true);
+        assert_eq!(input.boards[0].is_impossible(&input.pieces), false);
+        assert_eq!(input.boards[1].is_impossible(&input.pieces), false);    
+        assert_eq!(input.boards[2].is_impossible(&input.pieces), false);
 
-        assert_eq!(input2.area_fits(0), false);
-        assert_eq!(input2.area_fits(1), false);
-        assert_eq!(input2.area_fits(2), false);
-        assert_eq!(input2.area_fits(3), true);
+        assert_eq!(input2.boards[0].is_impossible(&input.pieces), true);
+        assert_eq!(input2.boards[1].is_impossible(&input.pieces), true);
+        assert_eq!(input2.boards[2].is_impossible(&input.pieces), true);
+        assert_eq!(input2.boards[3].is_impossible(&input.pieces), false);
     }
 
     #[test]
-    fn test_area_fits_real() {
-        let input = Input::read(DAY12_INPUT);
+    fn test_is_trivial() {
+        let input = Input::read(EXAMPLE1);
+        let input2 = Input::read(EXAMPLE2);
 
-        let misfits = input.boards.iter().enumerate()
-            .filter(|(n, _board)| {
-                !input.area_fits(*n)
-            })
-            .count();
+        assert_eq!(input.boards[0].is_trivial(3, 3), false);
+        assert_eq!(input.boards[1].is_trivial(3, 3), false);    
+        assert_eq!(input.boards[2].is_trivial(3, 3), false);
 
-        println!("{misfits} out of {} can't fit.", input.boards.len());
-
-        assert_eq!(misfits, 0);
-    }
-
-      #[test]
-    fn test_trivial_fits_real() {
-        let input = Input::read(DAY12_INPUT);
-
-        let trivial = input.boards.iter().enumerate()
-            .filter(|(n, _board)| {
-                input.trivial_fit(*n)
-            })
-            .count();
-
-        println!("{trivial} out of {} fit trivially.", input.boards.len());
-
-        assert_eq!(trivial, 0);
+        assert_eq!(input2.boards[0].is_trivial(3, 3), false);
+        assert_eq!(input2.boards[1].is_trivial(3, 3), false);
+        assert_eq!(input2.boards[2].is_trivial(3, 3), false);
+        assert_eq!(input2.boards[3].is_trivial(3, 3), true);
     }
 
     #[test]
@@ -311,7 +292,7 @@ mod test {
     fn test_part1() {
         // Based on the example in part 1.
         let d = Day12::new();
-        assert_eq!(d.part1(DAY12_INPUT), Answer::Numeric(577));
+        assert_eq!(d.part1(EXAMPLE2), Answer::Numeric(1));
     }
 
     #[test]

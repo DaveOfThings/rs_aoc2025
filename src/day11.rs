@@ -38,7 +38,6 @@ impl Node {
 
 struct Reactor {
     node_ids: HashMap<String, usize>,
-    nodes: Vec<Node>,
     inputs_to: Vec<Vec<usize>>,
 }
 
@@ -87,7 +86,7 @@ impl Reactor {
             })
         });
 
-        Reactor { node_ids, nodes, inputs_to }
+        Reactor { node_ids, inputs_to }
     }
 
     fn num_paths_to(&self, from: usize, to: usize, paths_to_cache: &mut HashMap<usize, usize>) -> usize {
@@ -232,7 +231,8 @@ hhh: out
         let input = Input::read(EXAMPLE1);
         let reactor = Reactor::new(&input);
 
-        assert_eq!(reactor.nodes.len(), 10);
+        assert_eq!(reactor.inputs_to.len(), 11);
+        assert_eq!(reactor.node_ids.len(), 11);
     }
 
     
